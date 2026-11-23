@@ -1,0 +1,37 @@
+=== host
+cpbee
+=== kernel
+Linux 6.12.111+deb13-amd64
+=== now
+1795416026
+=== uptime
+1046286.43 3954320.66
+=== load
+0.33 0.30 0.35 1/338 826841
+=== addr
+[{"ifindex":2,"ifname":"lan0","flags":["BROADCAST","MULTICAST","UP","LOWER_UP"],"operstate":"UP","address":"02:00:00:00:10:01","addr_info":[{"family":"inet","local":"192.168.10.1","prefixlen":24,"scope":"global","label":"lan0","valid_life_time":4294967295,"preferred_life_time":4294967295}]},{"ifindex":3,"ifname":"wan0","flags":["BROADCAST","MULTICAST","UP","LOWER_UP"],"operstate":"UP","address":"02:00:00:00:01:68","addr_info":[{"family":"inet","local":"192.0.2.68","prefixlen":24,"metric":100,"broadcast":"192.0.2.255","scope":"global","dynamic":true,"label":"wan0","valid_life_time":1598694,"preferred_life_time":1598694}]}]
+=== link
+[{"ifindex":2,"ifname":"lan0","operstate":"UP","address":"02:00:00:00:10:01"},{"ifindex":3,"ifname":"wan0","operstate":"UP","address":"02:00:00:00:01:68"}]
+=== route
+[{"dst":"default","gateway":"192.0.2.254","dev":"wan0","protocol":"dhcp","prefsrc":"192.0.2.68","metric":100,"flags":[]}]
+=== neigh
+[{"dst":"192.168.10.77","dev":"lan0","lladdr":"02:00:00:00:10:4d","state":["DELAY"]},{"dst":"192.168.10.73","dev":"lan0","lladdr":"02:00:00:00:10:49","state":["REACHABLE"]},{"dst":"192.168.10.66","dev":"lan0","lladdr":"02:00:00:00:10:42","state":["STALE"]},{"dst":"192.168.10.150","dev":"lan0","lladdr":"02:00:00:00:10:96","state":["STALE"]},{"dst":"192.168.10.151","dev":"lan0","state":["FAILED"]},{"dst":"169.254.216.6","dev":"lan0","lladdr":"02:00:00:00:10:4d","state":["STALE"]},{"dst":"192.0.2.254","dev":"wan0","lladdr":"02:00:00:00:01:fe","state":["REACHABLE"]}]
+=== leases
+1795458325 02:00:00:00:10:42 192.168.10.66 cmprinter 01:02:00:00:00:10:42
+1795445498 02:00:00:00:10:49 192.168.10.73 cmlaptop 01:02:00:00:10:49
+1795416000 02:00:00:00:10:77 192.168.10.120 * *
+1795500000 02:00:00:00:10:96 192.168.10.150 * 01:02:00:00:00:10:96
+=== dnsmasq
+interface=lan0
+no-resolv
+server=1.1.1.1
+server=9.9.9.9
+dhcp-range=192.168.10.100,192.168.10.250,255.255.255.0,12h
+# written by setup-router.sh leases
+dhcp-host=02:00:00:00:10:4d,cmdesktop,192.168.10.77
+dhcp-host=02:00:00:00:10:49,cmlaptop,192.168.10.73
+dhcp-host=02:00:00:00:10:42,cmprinter,192.168.10.66
+dhcp-host=02:00:00:00:10:aa,spare,192.168.10.90
+=== online
+                Online state: online
+=== end

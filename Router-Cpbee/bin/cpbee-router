@@ -1,0 +1,40 @@
+#!/usr/bin/perl
+# cpbee-router - read-only look at the cpbee router (see Router::Cpbee)
+#
+#   cpbee-router [--host NAME] [--probe HOST[:PORT] | --no-probe] status|hosts|wan|device
+use strict;
+use warnings;
+use FindBin qw($Bin);
+use lib "$Bin/../lib";
+use Getopt::Long qw(GetOptions);
+use Router::Cpbee;
+
+my ( $host, $probe ) = ( 'cpbee', '1.1.1.1:443' );    # TCP probe: the upstream router drops ping
+GetOptions( 'host=s' => \$host, 'probe=s' => \$probe, 'no-probe' => sub { $probe = undef } )
+  or die "usage: $0 [--host H] [--probe HOST[:PORT] | --no-probe] status|hosts|wan|device\n";
+my $cmd = shift(@ARGV) // 'status';
+my $r   = Router::Cpbee->new( host => $host );
+
+if ( $cmd eq 'hosts' ) {
+    printf "%-22s %-15s %-17s %-7s %-6s %s\n", qw(NAME IP MAC ADDR ACTIVE LEASE-EXPIRES);
+    for my $h ( $r->hosts ) {
+        printf "%-22s %-15s %-17s %-7s %-6s %s\n", $h->{name} || '-', @$h{qw(ip mac addressing active)},
+          $h->{lease_expires} ? scalar localtime $h->{lease_expires} : ( $h->{reserved} ? 'reserved' : '-' );
+    }
+}
+elsif ( $cmd eq 'wan' ) {
+    my $w = $r->wan;
+    print join( "\n", map { "$_: " . ( ref $w->{$_} ? join( ',', @{ $w->{$_} } ) : $w->{$_} ) } sort keys %$w ), "\n";
+}
+elsif ( $cmd eq 'device' ) {
+    my $d = $r->device;
+    print "$_: $d->{$_}\n" for sort keys %$d;
+}
+elsif ( $cmd eq 'status' ) {
+    my $up = $r->internet_up( defined $probe ? ( probe => $probe ) : () );
+    my $w  = $r->wan;
+    printf "internet: %s (link %s, %s, ip %s, gw %s)\n", $up ? 'UP' : 'DOWN',
+      @$w{qw(link isp_status ip gateway)};
+    exit( $up ? 0 : 1 );
+}
+else { die "unknown command: $cmd\n" }
