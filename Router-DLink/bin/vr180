@@ -1,0 +1,53 @@
+#!/usr/bin/perl
+# vr180 - look at (and, only with --yes, reboot) the D-Link router (see Router::DLink)
+#
+#   vr180 [--host NAME] status|hosts|wan|reboot [--yes]
+#
+# Always logs in from the vault (auth get https HOST --with-login): the D-Link
+# serves nothing useful without a login. reboot asks "Reboot HOST? [y/N]"
+# unless --yes is given.
+use strict;
+use warnings;
+use FindBin qw($Bin);
+use lib "$Bin/../lib";
+use Getopt::Long qw(GetOptions);
+use Router::DLink;
+
+my ( $host, $yes ) = ( 'vr180', 0 );
+GetOptions( 'host=s' => \$host, 'yes!' => \$yes ) or die "usage: $0 [--host H] status|hosts|wan|reboot [--yes]\n";
+my $cmd = shift(@ARGV) // 'status';
+die "unknown command: $cmd\n" unless $cmd =~ /^(?:status|hosts|wan|reboot)$/;
+
+my $r = Router::DLink->new_from_vault( host => $host );
+$r->login;
+
+my $rc = 0;
+if ( $cmd eq 'hosts' ) {
+    printf "%-22s %-15s %s\n", qw(NAME IP MAC);
+    printf "%-22s %-15s %s\n", @$_{qw(name ip mac)} for $r->hosts;
+}
+elsif ( $cmd eq 'wan' ) {
+    my $w = $r->wan;
+    print join( "\n", map { "$_: " . ( ref $w->{$_} ? join( ',', @{ $w->{$_} } ) : $w->{$_} ) } sort keys %$w ), "\n";
+}
+elsif ( $cmd eq 'status' ) {
+    my $w  = eval { $r->wan } || {};
+    my $up = $r->internet_up;
+    printf "internet: %s (ip %s, gw %s)\n", $up ? 'UP' : 'DOWN', $w->{ip} // '-', $w->{gateway} // '-';
+    $rc = $up ? 0 : 1;
+}
+elsif ( $cmd eq 'reboot' ) {
+    if ( !$yes ) {
+        print STDERR "Reboot $host? [y/N] ";
+        my $a = <STDIN>;
+        if ( !defined $a || $a !~ /^\s*y(es)?\s*$/i ) { print STDERR "not rebooting\n"; $r->logout; exit 2 }
+    }
+    $r->reboot( confirm => 1 );
+    print "Rebooting $host, waiting for it to come back...\n";
+    sleep 15;
+    my $back = $r->wait_until_up;
+    print $back ? "$host is back\n" : "$host did not come back within 4 minutes\n";
+    exit( $back ? 0 : 1 );
+}
+$r->logout;
+exit $rc;
