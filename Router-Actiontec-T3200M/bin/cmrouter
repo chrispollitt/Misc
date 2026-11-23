@@ -1,0 +1,44 @@
+#!/usr/bin/perl
+# cmrouter - read-only look at the Actiontec T3200M (see Router::Actiontec::T3200M)
+#
+#   cmrouter [--host NAME] [--login] status|hosts|wan|device
+#
+# Without --login only the public home page is read. With --login the login
+# comes from the vault (auth get https HOST --with-login).
+use strict;
+use warnings;
+use FindBin qw($Bin);
+use lib "$Bin/../lib";
+use Getopt::Long qw(GetOptions);
+use Router::Actiontec::T3200M;
+
+my ( $host, $login ) = ( 'cmrouter', 0 );
+GetOptions( 'host=s' => \$host, 'login!' => \$login ) or die "usage: $0 [--host H] [--login] status|hosts|wan|device\n";
+my $cmd = shift(@ARGV) // 'status';
+
+my $r = $login
+  ? Router::Actiontec::T3200M->new_from_vault( host => $host )
+  : Router::Actiontec::T3200M->new( host => $host );
+$r->login if $login;
+
+if ( $cmd eq 'hosts' ) {
+    printf "%-22s %-15s %-17s %-8s %-7s %s\n", qw(NAME IP MAC MEDIUM ADDR ACTIVE);
+    printf "%-22s %-15s %-17s %-8s %-7s %s\n", @$_{qw(name ip mac medium addressing active)} for $r->hosts;
+}
+elsif ( $cmd eq 'wan' ) {
+    my $w = $r->wan;
+    print join( "\n", map { "$_: " . ( ref $w->{$_} ? join( ',', @{ $w->{$_} } ) : $w->{$_} ) } sort keys %$w ), "\n";
+}
+elsif ( $cmd eq 'device' ) {
+    my $d = $r->device;
+    print "$_: $d->{$_}\n" for sort keys %$d;
+}
+elsif ( $cmd eq 'status' ) {
+    my $w = $r->wan;
+    printf "internet: %s (link %s, isp %s, ip %s, gw %s)\n", $r->internet_up ? 'UP' : 'DOWN',
+      @$w{qw(link isp_status ip gateway)};
+    printf "logged in: %s\n", $r->logged_in ? 'yes' : 'no';
+}
+else { die "unknown command: $cmd\n" }
+$r->logout;
+exit( $cmd eq 'status' && !$r->internet_up ? 1 : 0 );

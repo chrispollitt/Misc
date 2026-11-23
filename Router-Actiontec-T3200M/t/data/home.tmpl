@@ -1,0 +1,53 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>Home</title>
+<script language="JavaScript" src="js/RSA_Stripped.js"></script>
+<script language="Javascript">
+// Trimmed, made-up copy of the T3200M home page (firmware 31.164L.22): the same
+// variables and shapes as the real page, with invented hosts, MACs and addresses.
+// Placeholders are filled in by t/lib/FakeRouter.pm.
+var dsltime = '' ;
+
+//WAN Ethernet status
+var   wanEthStatus_LinkStatus     = htmlDecodeStr('@@LINK@@');
+var   wanEthStatus_ISPStatus      = htmlDecodeStr('@@ISP@@');
+var   wanEthStatus_MACAddress     = htmlDecodeStr('02&#58;00&#58;00&#58;aa&#58;bb&#58;01');
+var   wanEthStatus_IPAddress      = htmlDecodeStr('203.0.113.33');
+var   wanEthStatus_SubnetMask     = htmlDecodeStr('255.255.252.0');
+var   wanEthStatus_DefaultGateway = htmlDecodeStr('203.0.113.1');
+var   wanEthStatus_LeaseTimeRemaining = htmlDecodeStr('13381');
+var   wanEthStatus_DNSServer      = htmlDecodeStr('198.51.100.68&#44;198.51.100.124');
+var   wanEthStatus_Portocol       = htmlDecodeStr('IPoW');
+var   wanEthStatus_AddressingType = htmlDecodeStr('DHCP');
+
+var loginUserName=htmlDecodeStr('@@USER@@');
+var inputUserName=htmlDecodeStr('');
+var rootGuiLocked=htmlDecodeStr('@@LOCKED@@');
+
+//LAN status.
+var hostinfo = 'laptop-one/192.168.1.67/02&#58;00&#58;00&#58;00&#58;00&#58;01/802.11/DHCP/0|phone/192.168.1.70/02&#58;00&#58;00&#58;00&#58;00&#58;0A/802.11/DHCP/1|NAS-Box/192.168.1.68/02&#58;00&#58;00&#58;00&#58;00&#58;FF/Ethernet/Static/1';
+
+// device info
+var devinfo='T3200M|N/A|31.164L.22|1045207.50|tmp_hardware1.0';
+
+var key;
+var sessionKey='@@SESSIONKEY@@';
+var sessionId ='0';
+
+function on_load()
+{
+  setMaxDigits(262);key=new RSAKeyPair("10001","10001","@@MODULUS@@",1024);
+}
+</script>
+</head>
+<body>
+<form id="logn_frm" name="logn_frm" action="login.cgi" method="post" onsubmit="return false;">
+<input type="hidden" name="sessionKey" value='' >
+<input type="text" id="admin_user_name" name="inputUserName"/>
+<input type="password" id="admin_password" name="inputPassword"/>
+<input type="hidden" id="sessionId" name="sessionId" value='' >
+</form>
+</body>
+</html>
