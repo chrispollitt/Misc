@@ -1,0 +1,128 @@
+#!/usr/bin/perl
+# router-op - ask any of the home routers the same questions (see Router::Op)
+#
+#   router-op [options] ROUTER|all COMMAND
+#   router-op list | capabilities
+#
+#   ROUTER   cmrouter (Actiontec T3200M), vr180 (D-Link DIR-655), cpbee (the Debian gateway), or `all`
+#   COMMAND  status (default) | hosts | wan | device | uptime | internet | reboot
+#            port-forwards | wifi | firewall   (not available yet: they say so, the same way on every router)
+#
+# Options:  --yes (reboot without asking)   --active (hosts: only devices on the LAN now)
+#           --probe HOST:PORT (internet on cpbee: also one TCP connect from there)   --conf FILE (more router names)
+#
+# Exit status: status/internet: 0 if the internet is up (with `all`: on any of them), 1 if not, 2 if refused.
+# Logins come from the vault (auth get https HOST --with-login), never from the command line.
+# reboot needs one named router (never `all`) and asks "Reboot NAME? [y/N]" unless --yes.
+use strict;
+use warnings;
+use FindBin qw($Bin);
+use lib "$Bin/../lib";
+for my $d (qw(Router-Actiontec-T3200M Router-DLink Router-Cpbee)) {
+    unshift @INC, "$Bin/../../$d/lib" if -d "$Bin/../../$d/lib";
+}
+use Getopt::Long qw(GetOptions);
+use Router::Op;
+
+my ( $yes, $active, $probe, $conf ) = ( 0, 0, undef, undef );
+GetOptions( 'yes!' => \$yes, 'active!' => \$active, 'probe=s' => \$probe, 'conf=s' => \$conf )
+  or die "usage: $0 [--yes] [--active] [--probe HOST:PORT] [--conf FILE] ROUTER|all COMMAND\n";
+Router::Op->load_config($conf);
+
+my $which = shift(@ARGV) // 'list';
+my $cmd   = shift(@ARGV) // 'status';
+
+if ( $which eq 'list' ) {
+    printf "%-10s %-26s %s\n", qw(NAME MODEL HOST);
+    for my $n ( Router::Op->names ) {
+        printf "%-10s %-26s %s\n", $n, @{ $Router::Op::ROUTERS{$n} }{qw(model host)};
+    }
+    exit 0;
+}
+if ( $which eq 'capabilities' ) {
+    my @n = Router::Op->names;
+    my $c = Router::Op->capabilities;
+    printf "%-16s" . ( " %-9s" x @n ) . "\n", 'CALL', @n;
+    for my $k ( sort { ( $a =~ /\./ ) <=> ( $b =~ /\./ ) || $a cmp $b } keys %$c ) {
+        printf "%-16s" . ( " %-9s" x @n ) . "\n", $k, map { $c->{$k}{$_} // '-' } @n;
+    }
+    print "\nyes = works   no = this router cannot   todo = it could, not written yet\n";
+    exit 0;
+}
+
+( my $call = $cmd ) =~ tr/-/_/;
+die "unknown command: $cmd\n"
+  unless $call =~ /\A(?:status|hosts|wan|device|uptime|internet|reboot|port_forwards|wifi|firewall)\z/;
+
+my @names = $which eq 'all' ? Router::Op->names : ($which);
+die "unknown router: $which (try: router-op list)\n" if $which ne 'all' && !$Router::Op::ROUTERS{$which};
+die "reboot needs one named router, not all\n" if $call eq 'reboot' && @names != 1;
+
+my ( $any_up, $failed ) = ( 0, 0 );
+my $multi = @names > 1;
+for my $name (@names) {
+    my $r = eval { Router::Op->connect( $name, probe => $probe ) };
+    if ( !$r ) { _err( $name, $@ ); next }
+    my $ok = eval { _run( $r, $name, $call ); 1 };
+    _err( $name, $@ ) unless $ok;
+    eval { $r->logout };
+}
+exit( $call =~ /\A(?:status|internet)\z/ ? ( $any_up ? 0 : 1 ) : ( $failed ? 1 : 0 ) );
+
+sub _err {
+    my ( $name, $e ) = @_;
+    $e = 'failed' unless length $e;
+    $e =~ s/\s+at \S+ line \d+\.?\s*\z//;
+    chomp $e;
+    print $multi ? "$name: " : '', "ERROR: $e\n";
+    $failed++;
+}
+
+sub _run {
+    my ( $r, $name, $call ) = @_;
+    my $pre = $multi ? sprintf( "%-9s ", $name ) : '';
+    if ( $call eq 'hosts' ) {
+        printf "%-9s %-22s %-15s %-17s %-6s %s\n", 'ROUTER', qw(NAME IP MAC ACTIVE ADDR) if !$multi || $name eq ( Router::Op->names )[0];
+        printf "%-9s %-22s %-15s %-17s %-6s %s\n", $name, @$_{qw(name ip mac active addressing)} for $r->hosts( active => $active );
+    }
+    elsif ( $call eq 'wan' ) {
+        my $w = $r->wan;
+        print join( "\n", map { "$pre$_: " . ( ref $w->{$_} ? join( ',', @{ $w->{$_} } ) : $w->{$_} ) } sort keys %$w ), "\n";
+    }
+    elsif ( $call eq 'device' ) {
+        my $d = $r->device;
+        print join( "\n", map { "$pre$_: $d->{$_}" } sort keys %$d ), "\n";
+    }
+    elsif ( $call eq 'uptime' ) {
+        my $u = $r->uptime;
+        print $pre, defined $u ? sprintf( "up %dd %02dh %02dm (%d s)\n", int( $u / 86400 ), int( $u % 86400 / 3600 ), int( $u % 3600 / 60 ), $u ) : "unknown\n";
+    }
+    elsif ( $call eq 'internet' ) {
+        my $up = $r->internet_up;
+        $any_up ||= $up;
+        print $pre, $up ? "UP\n" : "DOWN\n";
+    }
+    elsif ( $call eq 'status' ) {
+        my $w  = $r->wan;
+        my $up = $r->internet_up;
+        $any_up ||= $up;
+        my $u = eval { $r->uptime };
+        printf "%sinternet %s  ip %s  gw %s  link %s  uptime %s\n", $pre, $up ? 'UP' : 'DOWN', $w->{ip} || '-', $w->{gateway} || '-',
+          $w->{link} || '-', defined $u ? sprintf( '%dd', int( $u / 86400 ) ) : '-';
+    }
+    elsif ( $call eq 'reboot' ) {
+        $r->supports('reboot') or die "not supported\n";
+        if ( !$yes ) {
+            print STDERR "Reboot $name (" . $r->model . ")? [y/N] ";
+            my $a = <STDIN>;
+            if ( !defined $a || $a !~ /^\s*y(es)?\s*$/i ) { print STDERR "not rebooting\n"; exit 2 }
+        }
+        $r->reboot( confirm => 1 );
+        print "Rebooting $name, waiting for it to come back...\n";
+        sleep 15;
+        my $back = $r->wait_until_up;
+        print $back ? "$name is back\n" : "$name did not come back in time\n";
+        exit( $back ? 0 : 1 );
+    }
+    else { $r->$call }    # port_forwards / wifi / firewall: croaks "not supported ..."
+}
